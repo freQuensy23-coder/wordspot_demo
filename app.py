@@ -21,7 +21,7 @@ classifier = pipeline(
     "audio-classification", model="MIT/ast-finetuned-speech-commands-v2", device=device
 )
 
-CLASSIFIER_TIME = 1
+CLASSIFIER_TIME = 4
 SAMPLE_RATE = 16000
 BUFFER_SIZE = 16
 MARVIN_PLOT_BUFFER_SIZE = 128
@@ -41,24 +41,24 @@ def get_ice_servers():
     try:
         account_sid = 'ACa1b60c020022926fe8f9aeed84164cc3'
         auth_token = '9a09590087cf8e45e588c26d9fe960f5'
-    except KeyError:
+        client = Client(account_sid, auth_token)
+
+        token = client.tokens.create()
+
+        return token.ice_servers
+    except Exception as e:
         st.warning(
-            "Stun server is not configured. Using public server instead"  # noqa: E501
+            f"Stun server is not configured {e}. Using public server instead"  # noqa: E501
         )
         return [{"urls": ["stun:stun.l.google.com:19302"]}]
 
-    client = Client(account_sid, auth_token)
-
-    token = client.tokens.create()
-
-    return token.ice_servers
 
 
 def main():
     webrtc_ctx = webrtc_streamer(
         key="speech-to-text",
         mode=WebRtcMode.SENDONLY,
-        audio_receiver_size=1024,
+        audio_receiver_size=8096,
         rtc_configuration={"iceServers": get_ice_servers()},
         media_stream_constraints={"video": False, "audio": True},
     )
@@ -70,6 +70,7 @@ def main():
         st.session_state['marvin_plot_buffer'] = []
 
     st_fig = st.empty()
+    marvin_plot = st.empty()
     pred = st.empty()
 
     while True:
@@ -111,6 +112,11 @@ def main():
 
             st_fig.pyplot(fig)
             pred.write(predictions)
+
+            fig = plt.figure(figsize=(10, 5))
+            plt.plot(st.session_state['marvin_plot_buffer'])
+            plt.ylim([0, 1])
+            marvin_plot.pyplot(fig)
 
             if prediction["label"] == 'marvin':
                 if prediction["score"] > 0.5:
