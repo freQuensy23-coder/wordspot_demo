@@ -18,7 +18,7 @@ classifier = pipeline(
 CLASSIFIER_TIME = 1
 SAMPLE_RATE = 16000
 BUFFER_SIZE = 16
-MARVIN_BUFFER_SIZE
+MARVIN_BUFFER_SIZE = 1
 
 # This code is based on https://github.com/whitphx/streamlit-webrtc/blob/c1fe3c783c9e8042ce0c95d789e833233fd82e74/sample_utils/turn.py
 @st.cache_data  # type: ignore
