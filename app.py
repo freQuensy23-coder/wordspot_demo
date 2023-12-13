@@ -15,6 +15,10 @@ classifier = pipeline(
     "audio-classification", model="MIT/ast-finetuned-speech-commands-v2", device=device
 )
 
+CLASSIFIER_TIME = 1
+SAMPLE_RATE = 16000
+BUFFER_SIZE = 16
+MARVIN_BUFFER_SIZE
 
 # This code is based on https://github.com/whitphx/streamlit-webrtc/blob/c1fe3c783c9e8042ce0c95d789e833233fd82e74/sample_utils/turn.py
 @st.cache_data  # type: ignore
@@ -70,24 +74,26 @@ def main():
             except queue.Empty:
                 st.warning("Audio frames queue is empty")
                 return
-            audio_frames = [f.to_ndarray() for f in audio_frames]
+            audio_frames = [f.to_ndarray(format='s16') for f in audio_frames]
             if len(audio_frames) == 0:
                 st.warning("No audio frames received")
                 return
             audio_frame = np.concatenate(audio_frames, axis=1).reshape(-1) / 32768
             st.session_state['audio_buffer'] = np.concatenate([st.session_state['audio_buffer'], audio_frame])
-            if len(st.session_state['audio_buffer']) > 16000 * 10:  # TODO - тут мб чтот не так, делал из головы
-                st.session_state['audio_buffer'] = st.session_state['audio_buffer'][-16000 * 10:]
+            if len(st.session_state['audio_buffer']) > 16000 * BUFFER_SIZE:  # TODO - тут мб чтот не так, делал из головы
+                st.session_state['audio_buffer'] = st.session_state['audio_buffer'][int(-16000 * BUFFER_SIZE):]
+
             buffered_audio = st.session_state['audio_buffer']
-            predictions = classifier(buffered_audio[:16000 * 2])
+            predictions = classifier(buffered_audio[:int(CLASSIFIER_TIME * 16000)])
             prediction = predictions[0]
             fig = plt.figure(figsize=(10, 5))
             plt.plot(buffered_audio)
+            plt.vlines((BUFFER_SIZE - CLASSIFIER_TIME) * SAMPLE_RATE, -1, 1, color='r')
             plt.ylim([-1, 1])
 
 
             st_fig.pyplot(fig)
-            pred.write(prediction)
+            pred.write(predictions)
 
             if prediction["label"] == 'marvin':
                 if prediction["score"] > 0.5:
