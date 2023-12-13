@@ -1,3 +1,5 @@
+from transformers import pipeline
+
 import os
 import queue
 import time
@@ -5,10 +7,14 @@ import time
 import numpy as np
 import streamlit as st
 from matplotlib import pyplot as plt
-from transformers import pipeline
+import sys
+
 from twilio.rest import Client
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import torch
+
+import sys
+
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 classifier = pipeline(
@@ -18,7 +24,8 @@ classifier = pipeline(
 CLASSIFIER_TIME = 1
 SAMPLE_RATE = 16000
 BUFFER_SIZE = 16
-MARVIN_BUFFER_SIZE = 1
+MARVIN_PLOT_BUFFER_SIZE = 128
+
 
 # This code is based on https://github.com/whitphx/streamlit-webrtc/blob/c1fe3c783c9e8042ce0c95d789e833233fd82e74/sample_utils/turn.py
 @st.cache_data  # type: ignore
@@ -32,8 +39,8 @@ def get_ice_servers():
 
     # Ref: https://www.twilio.com/docs/stun-turn/api
     try:
-        account_sid = os.environ["TWILIO_ACCOUNT_SID"]
-        auth_token = os.environ["TWILIO_AUTH_TOKEN"]
+        account_sid = 'ACa1b60c020022926fe8f9aeed84164cc3'
+        auth_token = '9a09590087cf8e45e588c26d9fe960f5'
     except KeyError:
         st.warning(
             "Stun server is not configured. Using public server instead"  # noqa: E501
@@ -59,6 +66,9 @@ def main():
     if st.session_state.get('audio_buffer') is None:
         st.session_state['audio_buffer'] = np.array([])
 
+    if st.session_state.get('marvin_plot_buffer') is None:
+        st.session_state['marvin_plot_buffer'] = []
+
     st_fig = st.empty()
     pred = st.empty()
 
@@ -80,17 +90,24 @@ def main():
                 return
             audio_frame = np.concatenate(audio_frames, axis=1).reshape(-1) / 32768
             st.session_state['audio_buffer'] = np.concatenate([st.session_state['audio_buffer'], audio_frame])
-            if len(st.session_state['audio_buffer']) > 16000 * BUFFER_SIZE:  # TODO - тут мб чтот не так, делал из головы
+            if len(st.session_state[
+                       'audio_buffer']) > 16000 * BUFFER_SIZE:  # TODO - тут мб чтот не так, делал из головы
                 st.session_state['audio_buffer'] = st.session_state['audio_buffer'][int(-16000 * BUFFER_SIZE):]
 
             buffered_audio = st.session_state['audio_buffer']
             predictions = classifier(buffered_audio[:int(CLASSIFIER_TIME * 16000)])
+            predictions_dict = {x["label"]: x["score"] for x in predictions}
+
+            st.session_state['marvin_plot_buffer'].append(predictions_dict.get('marvin') or 0)
+            if len(st.session_state['marvin_plot_buffer']) > MARVIN_PLOT_BUFFER_SIZE:
+                st.session_state['marvin_plot_buffer'] = st.session_state['marvin_plot_buffer'][
+                                                         -MARVIN_PLOT_BUFFER_SIZE:]
+
             prediction = predictions[0]
             fig = plt.figure(figsize=(10, 5))
             plt.plot(buffered_audio)
             plt.vlines((BUFFER_SIZE - CLASSIFIER_TIME) * SAMPLE_RATE, -1, 1, color='r')
             plt.ylim([-1, 1])
-
 
             st_fig.pyplot(fig)
             pred.write(predictions)
