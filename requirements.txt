@@ -76,7 +76,7 @@ torch==2.1.1
 torchaudio==2.1.1
 tornado==6.4
 tqdm==4.66.1
-transformers==4.36.0
+transformers==4.36.1
 twilio==8.10.3
 typing_extensions==4.9.0
 tzdata==2023.3
